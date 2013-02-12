@@ -41,11 +41,15 @@ private String markdownify(String text) {
 	text = replaceHeaders text
 	text = replaceOrderedLists text
 	text = replaceUnorderedLists text
+	text = replaceImages text
+	text = replaceUnnecessaryMarkup text
+	text = tidyBlankLines text
+	text
 }
 
 private String replaceCodeBlocks(String text) {
 	text.replaceAll(~/<pre>(?:<code>)?(.*?)(?:<\/code>)?<\/pre>/) { match ->
-		"\n    ${unescapeHtml(match[1].replaceAll('<br />', '\n    '))}\n"
+		"\n\n    ${unescapeHtml(match[1].replaceAll('<br />', '\n    '))}\n\n"
 	}
 }
 
@@ -59,30 +63,50 @@ private String replaceInlineElements(String text) {
 	text = text.replaceAll ~/<em(?:.*?)>(.*?)<\/em>/, '_$1_'
 	text = text.replaceAll ~/<strong(?:.*?)>(.*?)<\/strong>/, '**$1**'
 	text = text.replaceAll ~/<code(?:.*?)>(.*?)<\/code>/, '`$1`'
-	text = text.replaceAll ~/<tt(?:.*?)>(.*?)<\/tt>/, '`$1`'
+	text = text.replaceAll(~/<tt(?:.*?)>(.*?)<\/tt>/) { match ->
+		unescapeHtml "`${match[1]}`"
+	}
 }
 
 private String replaceHeaders(String text) {
-	text = text.replaceAll(~/<h([1-6])(?:.*?)>(.*?)<\/h\1>/) { match ->
-		"\n${'#' * match[1].toInteger()} ${match[2]}\n"
+	text = text.replaceAll(~/(?s)<h([1-6])(?:.*?)>(.*?)<\/h\1>/) { match ->
+		"\n\n${'#' * match[1].toInteger()} ${match[2]}\n\n"
 	}
 }
 
 private String replaceOrderedLists(String text) {
-	text = text.replaceAll(~/<ol>(.*?)<\/ol>/) { listMatch ->
+	text = text.replaceAll(~/(?s)<ol>(.*?)<\/ol>/) { listMatch ->
 		int i = 1
-		'\n' + listMatch[1].replaceAll(~/<li>(.*?)<\/li>/) { itemMatch ->
+		'\n\n' + listMatch[1].replaceAll(~/(?s)<li>(.*?)<\/li>/) { itemMatch ->
 			"${i++}. ${itemMatch[1]}\n"
-		}
+		} + '\n\n'
 	}
 }
 
 private String replaceUnorderedLists(String text) {
-	text = text.replaceAll(~/<ul>(.*?)<\/ul>/) { listMatch ->
-		'\n' + listMatch[1].replaceAll(~/<li>(.*?)<\/li>/) { itemMatch ->
+	text = text.replaceAll(~/(?s)<ul>(.*?)<\/ul>/) { listMatch ->
+		'\n\n' + listMatch[1].replaceAll(~/(?s)<li>(.*?)<\/li>/) { itemMatch ->
 			"* ${itemMatch[1]}\n"
-		}
+		} + '\n\n'
 	}
+}
+
+private String replaceImages(String text) {
+	text = text.replaceAll ~/<img(?:.*?)src="(.*?)"(?:.*?)alt="(.*?)"(?:.*?)title="(.*?)"(?:.*?)>/, '![$2]($1 $3)'
+	text = text.replaceAll ~/<img(?:.*?)src="(.*?)"(?:.*?)alt="(.*?)"(?:.*?)>/, '![$2]($1)'
+	text = text.replaceAll ~/<img(?:.*?)src="(.*?)"(?:.*?)>/, '![]($1)'
+}
+
+private String replaceUnnecessaryMarkup(String text) {
+	text = text.replaceAll(~/(?s)<a name=".*?">(.*?)<\/a>/) { match ->
+		match[1].trim()
+	}
+	text = text.replaceAll ~/<\/>/, ''
+	text = text.replaceAll ~/<div(?:.*?)>/, ''
+}
+
+private String tidyBlankLines(String text) {
+	text = text.replaceAll ~/(?m)^(\s*\n){2,}/, '\n'
 }
 
 private String normalize(String s) {
